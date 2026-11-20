@@ -16,7 +16,7 @@
 
 1. Зарегайся на https://supabase.com → **New project** (регион поближе, например Frankfurt).
 2. **SQL Editor** → New query → вставь весь `schema.sql` → **Run**. Должно быть `Success. No rows returned`.
-   Потом так же — весь `migration.sql` (пауза, таймер, флажки).
+   Потом так же — весь `migration.sql` (пауза, таймер, флажки), затем `migration2.sql` (личная цель часов).
 3. **Project Settings → API** (или **API Keys**): скопируй
    - **Project URL** → `SUPABASE_URL` в `config.js`
    - **anon public** (или **publishable**, `sb_publishable_...`) → `SUPABASE_ANON_KEY`
@@ -61,4 +61,4 @@ GitHub → репо → **Settings → Pages** → Source: **Deploy from a branc
 - «к плану» — сравнение с равномерным темпом (60/7 ≈ 8.6 ч в день) на начало сегодняшнего дня.
 - Друг обновляется в реальном времени (Supabase Realtime).
 - Свои сессии можно удалить (если забыл остановить), отчёт за день — один, можно править; пустой отчёт = удаление.
-- Цель меняется в `config.js` → `WEEKLY_GOAL_HOURS`.
+- Цель часов в неделю — у каждого своя, во вкладке «Профиль» (по умолчанию `WEEKLY_GOAL_HOURS` из `config.js`).

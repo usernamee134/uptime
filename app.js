@@ -28,8 +28,16 @@ function hexToRgba(hex, a) {
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 const COLORS = ['#00e5ff', '#ff3ea5', '#4ade80', '#f5b83d', '#a78bfa'];
-const GOAL = WEEKLY_GOAL_HOURS * 3600;
-const DAILY_GOAL_H = WEEKLY_GOAL_HOURS / 7;
+// цель человека (часы) на неделю, начинающуюся weekStart.
+// действует последняя запись с week_start <= этой недели; если записей нет — значение из config.js
+function goalHours(uid, weekStart) {
+  const k = dayKey(weekStart);
+  let best = null;
+  for (const g of state.goals) {
+    if (g.user_id === uid && g.week_start <= k && (!best || g.week_start > best.week_start)) best = g;
+  }
+  return best ? best.hours : WEEKLY_GOAL_HOURS;
+}
 
 // ================= состояние =================
 
@@ -40,6 +48,7 @@ const state = {
   reports: [],
   timers: [],          // текущие заходы (секундомер/таймер), по одному на человека
   laps: [],            // флажки
+  goals: [],           // история целей часов в неделю
   closed: new Map(),   // userId -> Map(dayKey -> секунды) только по закрытым сессиям
   tab: 'home',
   period: 'week',
@@ -156,6 +165,10 @@ async function loadSessions() { state.sessions = await fetchAll('sessions', ['id
 async function loadReports() { state.reports = await fetchAll('reports', ['day', 'user_id']); }
 async function loadTimers() { state.timers = await fetchAll('timers', ['user_id']); }
 async function loadLaps() { state.laps = await fetchAll('laps', ['id']); }
+async function loadGoals() {
+  try { state.goals = await fetchAll('goals', ['user_id', 'week_start']); }
+  catch (e) { console.warn('goals недоступны (migration2.sql не выполнен?)', e); state.goals = []; }
+}
 
 async function syncClock() {
   const t0 = Date.now();
@@ -166,7 +179,7 @@ async function syncClock() {
 
 async function loadAll() {
   await Promise.all([loadProfiles(), syncClock()]);
-  await Promise.all([loadSessions(), loadReports(), loadTimers(), loadLaps()]);
+  await Promise.all([loadSessions(), loadReports(), loadTimers(), loadLaps(), loadGoals()]);
 }
 
 // ================= рендер: главная =================
@@ -196,6 +209,8 @@ function renderPeople() {
     const lastFlag = [...state.laps].reverse()
       .find((l) => l.user_id === p.id && dayKey(new Date(l.at)) === today);
     const day = m.get(today) || 0;
+    const goalH = goalHours(p.id, ws);
+    const GOAL = goalH * 3600;
     const left = Math.max(0, GOAL - week);
     const plan = (GOAL * dayIdx) / 7;     // сколько должно быть к началу сегодняшнего дня
     const diff = week - plan;
@@ -208,11 +223,11 @@ function renderPeople() {
         </div>
         <div class="status">${status}</div>
         <div class="kv"><span>Сегодня</span><b class="mono">${fmtHM(day)}</b></div>
-        <div class="kv"><span>Неделя</span><b class="mono">${fmtHM(week)} / ${WEEKLY_GOAL_HOURS} ч</b></div>
+        <div class="kv"><span>Неделя</span><b class="mono">${fmtHM(week)} / ${goalH} ч</b></div>
         <div class="bar"><div style="width:${Math.min(100, (week / GOAL) * 100)}%"></div></div>
         <div class="kv small">
           <span>${left > 0 ? `Осталось ${fmtHM(left)} · ~${fmtHM(left / daysLeft)}/день` : 'Цель недели выполнена ✅'}</span>
-          <span class="${diff >= 0 ? 'good' : 'bad'}" title="Относительно равномерного плана ${DAILY_GOAL_H.toFixed(1)} ч/день на начало сегодняшнего дня">
+          <span class="${diff >= 0 ? 'good' : 'bad'}" title="Относительно равномерного плана ${(goalH / 7).toFixed(1)} ч/день на начало сегодняшнего дня">
             ${diff >= 0 ? '+' : '−'}${fmtHM(Math.abs(diff))} к плану
           </span>
         </div>
@@ -351,15 +366,18 @@ function renderBar() {
     borderRadius: 3,
     data: days.map((d) => (maps.get(p.id).get(dayKey(d)) || 0) / 3600),
   }));
-  datasets.push({
-    type: 'line',
-    label: `план ${DAILY_GOAL_H.toFixed(1)} ч/день`,
-    data: days.map(() => +DAILY_GOAL_H.toFixed(2)),
-    borderColor: '#8b93a7',
-    borderDash: [6, 4],
-    borderWidth: 1,
-    pointRadius: 0,
+  // пунктир «план в день»: одна серая линия, если цели совпадают, иначе своя у каждого
+  const plans = people.map((p) => days.map((d) => goalHours(p.id, startOfWeek(d)) / 7));
+  const same = plans.every((pl) => JSON.stringify(pl) === JSON.stringify(plans[0]));
+  const planLine = (data, label, color) => ({
+    type: 'line', label, data, borderColor: color, borderDash: [6, 4], borderWidth: 1, pointRadius: 0,
   });
+  if (same && plans.length) {
+    const h = plans[0][plans[0].length - 1];
+    datasets.push(planLine(plans[0], `план ${h.toFixed(1)} ч/день`, '#6f97a1'));
+  } else {
+    people.forEach((p, i) => datasets.push(planLine(plans[i], `план: ${p.name}`, colorOf(p.id))));
+  }
 
   $('#period-totals').innerHTML = people.map((p) =>
     `<span style="color:${colorOf(p.id)}">${esc(p.name)}: <b class="mono">${fmtHM(sumRange(maps.get(p.id), from, n))}</b></span>`
@@ -460,10 +478,11 @@ function renderWeeks() {
   const rows = [];
   for (let w = cur; w >= firstWeek; w = addDays(w, -7)) {
     const isCur = w.getTime() === cur.getTime();
-    const cells = maps.map((m) => {
+    const cells = maps.map((m, i) => {
       const s = sumRange(m, w, 7);
-      const mark = isCur ? '⏳' : s >= GOAL ? '✅' : '❌';
-      return `<td class="mono">${fmtHM(s)} ${mark}</td>`;
+      const g = goalHours(people[i].id, w);
+      const mark = isCur ? '⏳' : s >= g * 3600 ? '✅' : '❌';
+      return `<td class="mono">${fmtHM(s)} <span class="muted">/ ${g} ч</span> ${mark}</td>`;
     }).join('');
     rows.push(`<tr><td>${fmtDate(w)} – ${fmtDate(addDays(w, 6))}</td>${cells}</tr>`);
   }
@@ -526,6 +545,8 @@ function renderFeed() {
 function renderProfile() {
   const nameInput = $('#p-name');
   if (document.activeElement !== nameInput) nameInput.value = nameOf(state.user.id);
+  const goalInput = $('#p-goal');
+  if (document.activeElement !== goalInput) goalInput.value = goalHours(state.user.id, startOfWeek(now()));
   $('#p-email-cur').textContent = state.user.email + (state.user.new_email ? ` (ждёт подтверждения: ${state.user.new_email})` : '');
 }
 
@@ -556,6 +577,22 @@ $('#form-name').addEventListener('submit', (e) => {
     $('#me-name').textContent = name;
     renderAll();
     return 'Сохранено ✓';
+  });
+});
+
+$('#form-goal').addEventListener('submit', (e) => {
+  e.preventDefault();
+  withForm(e.target, async () => {
+    const hours = Math.round(Number($('#p-goal').value));
+    if (!(hours >= 1 && hours <= 168)) return 'От 1 до 168 часов';
+    const { error } = await sb.from('goals').upsert(
+      { user_id: state.user.id, week_start: dayKey(startOfWeek(now())), hours },
+      { onConflict: 'user_id,week_start' },
+    );
+    if (error) throw error;
+    await loadGoals();
+    renderAll();
+    return `Цель ${hours} ч/неделю сохранена ✓`;
   });
 });
 
@@ -782,6 +819,7 @@ function subscribe() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, onChange('p', loadProfiles))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'timers' }, onChange('t', loadTimers))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'laps' }, onChange('l', loadLaps))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, onChange('g', loadGoals))
     .subscribe();
 }
 

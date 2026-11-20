@@ -119,6 +119,15 @@
 
     <section id="tab-profile" class="tab" hidden>
       <div class="card">
+        <h3>Цель часов в неделю</h3>
+        <p class="muted">Действует с текущей недели. Прошлые недели проверяются по цели, которая была тогда.</p>
+        <form id="form-goal" class="pform">
+          <input id="p-goal" type="number" min="1" max="168" step="1" required>
+          <button type="submit">Сохранить цель</button>
+          <span class="muted msg"></span>
+        </form>
+      </div>
+      <div class="card">
         <h3>Имя</h3>
         <form id="form-name" class="pform">
           <input id="p-name" type="text" maxlength="40" required placeholder="Как тебя видит друг">
