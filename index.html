@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>60 ч / неделю</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+
+<div id="config-error" class="card center" hidden>
+  <h2>Не настроен config.js</h2>
+  <p>Впиши SUPABASE_URL и SUPABASE_ANON_KEY в <code>config.js</code> (см. README).</p>
+</div>
+
+<section id="auth" class="card center" hidden>
+  <h1>⏱ 60 ч / неделю</h1>
+  <form id="auth-form">
+    <input id="auth-name" type="text" placeholder="Имя (как тебя видит друг)" hidden>
+    <input id="auth-email" type="email" placeholder="Email" required autocomplete="email">
+    <input id="auth-pass" type="password" placeholder="Пароль" required minlength="6" autocomplete="current-password">
+    <button id="auth-submit" type="submit">Войти</button>
+  </form>
+  <p><a href="#" id="auth-toggle">Нет аккаунта? Регистрация</a></p>
+  <p id="auth-msg" class="muted"></p>
+</section>
+
+<div id="app" hidden>
+  <header>
+    <b class="logo">⏱ 60 ч</b>
+    <nav>
+      <button data-tab="home" class="active">Главная</button>
+      <button data-tab="stats">Статистика</button>
+      <button data-tab="reports">Отчёты</button>
+    </nav>
+    <span class="spacer"></span>
+    <span id="me-name" class="muted"></span>
+    <button id="logout" class="ghost">Выйти</button>
+  </header>
+
+  <main>
+    <section id="tab-home" class="tab">
+      <div class="card timer">
+        <div class="seg center-row" id="mode">
+          <button data-mode="stopwatch" class="active">Секундомер</button>
+          <button data-mode="timer">Таймер</button>
+        </div>
+        <div id="timer-setup" class="row center-row" hidden>
+          <button data-min="25">25 м</button>
+          <button data-min="50">50 м</button>
+          <button data-min="90">90 м</button>
+          <input id="timer-min" type="number" min="1" max="720" value="50">
+          <span class="muted">мин</span>
+        </div>
+        <div id="my-time" class="big mono">0:00:00</div>
+        <div id="my-sub" class="muted"></div>
+        <div id="timer-controls" class="row center-row"></div>
+        <div id="lap-input" class="row center-row" hidden>
+          <span id="lap-at" class="mono muted"></span>
+          <input id="lap-note" type="text" maxlength="200" placeholder="Подпись к флажку (Enter — сохранить)">
+          <button id="lap-save">🚩 Сохранить</button>
+          <button id="lap-cancel" class="ghost">✕</button>
+        </div>
+        <div id="my-today" class="muted"></div>
+        <ul id="laps" class="list laps"></ul>
+      </div>
+      <div id="people" class="grid"></div>
+      <div class="card">
+        <h3>Мои последние сессии</h3>
+        <ul id="my-sessions" class="list"></ul>
+      </div>
+    </section>
+
+    <section id="tab-stats" class="tab" hidden>
+      <div class="card">
+        <div class="row">
+          <h3>По дням</h3>
+          <span class="spacer"></span>
+          <div class="seg" id="period">
+            <button data-p="week" class="active">Эта неделя</button>
+            <button data-p="lastweek">Прошлая</button>
+            <button data-p="30">30 дней</button>
+            <button data-p="90">90 дней</button>
+          </div>
+        </div>
+        <div id="period-totals" class="totals"></div>
+        <div class="chart-wrap"><canvas id="bar"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Активность за год</h3>
+        <div id="heatmaps"></div>
+      </div>
+      <div class="card">
+        <h3>Итоги по неделям</h3>
+        <table id="weeks"></table>
+      </div>
+    </section>
+
+    <section id="tab-reports" class="tab" hidden>
+      <div class="card">
+        <div class="row">
+          <h3>Что сделал</h3>
+          <span class="spacer"></span>
+          <input type="date" id="report-day">
+        </div>
+        <div id="report-hours" class="muted"></div>
+        <textarea id="report-text" rows="5" placeholder="Кратко: что сделал за день"></textarea>
+        <div class="row">
+          <button id="report-save">Сохранить</button>
+          <span id="report-msg" class="muted"></span>
+        </div>
+      </div>
+      <div id="feed"></div>
+    </section>
+  </main>
+</div>
+
+</body>
+</html>
