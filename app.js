@@ -30,7 +30,7 @@ function hexToRgba(hex, a) {
 
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-const COLORS = ['#ef4444', '#f5b83d', '#4ade80', '#c084fc', '#38bdf8'];
+const COLORS = ['#00e5ff', '#ff3ea5', '#4ade80', '#f5b83d', '#a78bfa'];
 const GOAL = WEEKLY_GOAL_HOURS * 3600;
 const DAILY_GOAL_H = WEEKLY_GOAL_HOURS / 7;
 
@@ -65,8 +65,8 @@ if (SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.includes('YOUR-')
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 if (window.Chart) {
-  Chart.defaults.color = '#a3908c';
-  Chart.defaults.borderColor = '#2f2525';
+  Chart.defaults.color = '#6f97a1';
+  Chart.defaults.borderColor = '#16303a';
 }
 
 // ================= подсчёт времени =================
