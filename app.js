@@ -19,10 +19,7 @@ function fmtHMS(sec) {
   sec = Math.max(0, Math.floor(sec));
   return `${Math.floor(sec / 3600)}:${pad(Math.floor(sec / 60) % 60)}:${pad(sec % 60)}`;
 }
-function fmtHM(sec) {
-  const m = Math.max(0, Math.round(sec / 60));
-  return `${Math.floor(m / 60)} ч ${pad(m % 60)} м`;
-}
+const fmtHM = fmtHMS; // везде показываем с точностью до секунды
 function hexToRgba(hex, a) {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
@@ -48,7 +45,7 @@ const state = {
   period: 'week',
   clockOffset: 0,      // серверное время - локальное, мс
   uiMode: localStorage.getItem('uiMode') || 'stopwatch',
-  timerMin: Number(localStorage.getItem('timerMin')) || 50,
+  timerMin: Number(localStorage.getItem('timerMin')) || 30,
   pendingLap: null,    // { at: Date, elapsed: сек } — флажок, ждущий подписи
 };
 let barChart = null;
@@ -257,7 +254,7 @@ function renderTimer() {
   el.className = `big mono ${cls}`;
   $('#my-sub').textContent = sub;
   $('#my-today').textContent = `Сегодня всего: ${fmtHM(today)}`;
-  document.title = b ? `${b.paused ? '⏸' : '▶'} ${text} · 60 ч` : '60 ч / неделю';
+  document.title = b ? `${b.paused ? '⏸' : '▶'} ${text} · uptime` : 'uptime';
 
   // переключатель режима — только когда нет захода
   $$('#mode button').forEach((x) => {
@@ -278,6 +275,7 @@ function renderTimer() {
                 <button class="big-btn" data-act="flag" ${dis}>🚩 Флажок</button>
                 <button class="big-btn" data-act="reset" ${dis}>⏹ Сброс</button>`,
       paused: `<button class="big-btn primary" data-act="resume" ${dis}>▶ Продолжить</button>
+               <button class="big-btn" data-act="flag" ${dis}>🚩 Флажок</button>
                <button class="big-btn" data-act="reset" ${dis}>⏹ Сброс</button>`,
     }[st];
   }
@@ -351,7 +349,7 @@ function renderBar() {
     label: p.name,
     backgroundColor: colorOf(p.id),
     borderRadius: 3,
-    data: days.map((d) => +(((maps.get(p.id).get(dayKey(d)) || 0) / 3600).toFixed(2))),
+    data: days.map((d) => (maps.get(p.id).get(dayKey(d)) || 0) / 3600),
   }));
   datasets.push({
     type: 'line',
@@ -377,7 +375,7 @@ function renderBar() {
       maintainAspectRatio: false,
       animation: false,
       scales: { y: { beginAtZero: true, title: { display: true, text: 'часы' } } },
-      plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y.toFixed(1)} ч` } } },
+      plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtHMS(c.parsed.y * 3600)}` } } },
     },
   });
 }
@@ -523,6 +521,74 @@ function renderFeed() {
   }).join('');
 }
 
+// ================= профиль =================
+
+function renderProfile() {
+  const nameInput = $('#p-name');
+  if (document.activeElement !== nameInput) nameInput.value = nameOf(state.user.id);
+  $('#p-email-cur').textContent = state.user.email + (state.user.new_email ? ` (ждёт подтверждения: ${state.user.new_email})` : '');
+}
+
+const formMsg = (form, text) => { form.querySelector('.msg').textContent = text; };
+
+// проверка текущего пароля перед сменой почты/пароля
+async function checkPassword(password) {
+  const { error } = await sb.auth.signInWithPassword({ email: state.user.email, password });
+  return !error;
+}
+
+async function withForm(form, fn) {
+  const btn = form.querySelector('button');
+  btn.disabled = true;
+  formMsg(form, '…');
+  try { formMsg(form, await fn()); } catch (e) { formMsg(form, `Ошибка: ${e.message}`); }
+  btn.disabled = false;
+}
+
+$('#form-name').addEventListener('submit', (e) => {
+  e.preventDefault();
+  withForm(e.target, async () => {
+    const name = $('#p-name').value.trim();
+    if (!name) return 'Имя не может быть пустым';
+    const { error } = await sb.from('profiles').update({ name }).eq('id', state.user.id);
+    if (error) throw error;
+    await loadProfiles();
+    $('#me-name').textContent = name;
+    renderAll();
+    return 'Сохранено ✓';
+  });
+});
+
+$('#form-email').addEventListener('submit', (e) => {
+  e.preventDefault();
+  withForm(e.target, async () => {
+    const email = $('#p-email').value.trim();
+    if (!(await checkPassword($('#p-email-pass').value))) return 'Неверный текущий пароль';
+    const { data, error } = await sb.auth.updateUser({ email });
+    if (error) throw error;
+    state.user = data.user;
+    $('#p-email').value = '';
+    $('#p-email-pass').value = '';
+    renderProfile();
+    return data.user.new_email
+      ? `Письмо с подтверждением отправлено на ${data.user.new_email} — перейди по ссылке`
+      : 'Почта изменена ✓';
+  });
+});
+
+$('#form-pass').addEventListener('submit', (e) => {
+  e.preventDefault();
+  withForm(e.target, async () => {
+    const pw = $('#p-pass-new').value;
+    if (pw !== $('#p-pass-new2').value) return 'Новые пароли не совпадают';
+    if (!(await checkPassword($('#p-pass-cur').value))) return 'Неверный текущий пароль';
+    const { error } = await sb.auth.updateUser({ password: pw });
+    if (error) throw error;
+    e.target.reset();
+    return 'Пароль изменён ✓';
+  });
+});
+
 // ================= общий рендер =================
 
 function renderAll() {
@@ -530,6 +596,7 @@ function renderAll() {
   if (state.tab === 'home') { renderPeople(); renderMySessions(); renderLaps(); }
   if (state.tab === 'stats') renderStats();
   if (state.tab === 'reports') { renderReportHours(); renderFeed(); }
+  if (state.tab === 'profile') renderProfile();
 }
 
 function switchTab(tab) {
@@ -589,6 +656,7 @@ async function saveLap() {
   state.pendingLap = null;
   $('#lap-input').hidden = true;
   const note = $('#lap-note').value.trim() || null;
+  $('#lap-note').value = '';
   const { error } = await sb.from('laps').insert({
     user_id: state.user.id, at: p.at.toISOString(), elapsed_seconds: p.elapsed, note,
   });
@@ -600,6 +668,7 @@ async function saveLap() {
 function cancelLap() {
   state.pendingLap = null;
   $('#lap-input').hidden = true;
+  $('#lap-note').value = '';
 }
 
 async function deleteLap(id) {
@@ -640,7 +709,7 @@ function beep() {
 }
 function notify(body) {
   if ('Notification' in window && Notification.permission === 'granted') {
-    try { new Notification('⏱ 60 ч', { body }); } catch { /* мобильные браузеры */ }
+    try { new Notification('⏱ uptime', { body }); } catch { /* мобильные браузеры */ }
   }
 }
 
@@ -832,6 +901,7 @@ sb.auth.onAuthStateChange((_event, session) => {
   if (session?.user) {
     // setTimeout — чтобы не дёргать supabase изнутри колбэка (может зависнуть)
     if (!state.user) setTimeout(() => startApp(session.user), 0);
+    else state.user = session.user; // смена почты/пароля, обновление токена
   } else if (!state.user) {
     $('#auth').hidden = false;
   }

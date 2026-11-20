@@ -14,6 +14,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -144,6 +145,10 @@ main { max-width: 1000px; margin: 0 auto; padding: 16px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 500; }
+
+/* профиль */
+.pform { display: grid; gap: 10px; max-width: 420px; }
+.pform button { justify-self: start; }
 
 /* отчёты */
 .feed-day h3 { display: flex; gap: 10px; }
